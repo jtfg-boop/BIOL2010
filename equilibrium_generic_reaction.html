@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Equilibrium: A ⇌ B</title>
+<style>
+  body { margin: 0; background: #FBFAF7; color: #2C2C2A;
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 26px 22px 44px; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+  .sub { font-size: 14px; color: #5F5E5A; margin: 0 0 18px; line-height: 1.5; }
+  .card { background: #FFFFFF; border: 1px solid #E7E5DC; border-radius: 12px; padding: 18px 20px 16px; }
+  .top { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .lean { font-size: 20px; font-weight: 600; margin: 0; }
+  .pred { font-size: 14px; color: #5F5E5A; margin: 0; }
+  .pred b { color: #2C2C2A; font-variant-numeric: tabular-nums; }
+  .krow { display: flex; align-items: center; gap: 12px; font-size: 13px; color: #5F5E5A; margin: 12px 0 12px; flex-wrap: wrap; }
+  .krow input[type=range] { flex: 1; min-width: 180px; }
+  .kval { min-width: 86px; color: #2C2C2A; font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .presets { display: flex; gap: 6px; }
+  canvas { width: 100%; height: auto; display: block; }
+  .parts { border: 1px solid #EFEDE6; border-radius: 8px; background: #FBFAF7; }
+  .rates { margin: 12px 0 6px; font-size: 13px; color: #5F5E5A; }
+  .rate { display: flex; align-items: center; gap: 10px; margin: 5px 0; }
+  .rate .lbl { width: 130px; }
+  .rate .bar { flex: 1; height: 10px; background: #F1EFE8; border-radius: 5px; overflow: hidden; }
+  .rate .fill { height: 100%; border-radius: 5px; transition: width .15s; }
+  .rate .num { width: 90px; text-align: right; font-variant-numeric: tabular-nums; }
+  .comp { height: 16px; border-radius: 8px; overflow: hidden; display: flex; margin: 10px 0 4px; border: 1px solid #E7E5DC; }
+  .comp div { height: 100%; transition: width .15s; }
+  .read { font-size: 13.5px; color: #5F5E5A; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+  .read b { color: #2C2C2A; font-variant-numeric: tabular-nums; }
+  .plot { margin-top: 10px; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+  button { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px;
+           border: 1px solid #C9C7BD; background: #FFFFFF; color: #2C2C2A; cursor: pointer; }
+  button:hover { background: #F5F4EF; }
+  button:active { transform: scale(0.98); }
+  .presets button { padding: 4px 9px; font-size: 12.5px; }
+  .presets button.on { background: #2C2C2A; color: #FFFFFF; border-color: #2C2C2A; }
+  label.chk { font-size: 13px; color: #5F5E5A; display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .legend { font-size: 13px; color: #5F5E5A; margin: 18px 0 0; line-height: 1.55; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Equilibrium: A &#8652; B</h1>
+  <p class="sub">Every dot is one molecule. Each step, reactant dots (gray) can convert to product (teal) and product dots can convert back. The equilibrium constant K is the product-to-reactant ratio the mixture settles at &#8212; it sets how the two rates compare, and therefore how lopsided the final mixture is. Watch the flashes: at equilibrium the flipping never stops; only the totals stop changing.</p>
+
+  <div class="card">
+    <div class="top">
+      <p class="lean" id="lean"></p>
+      <p class="pred" id="pred"></p>
+    </div>
+    <div class="krow">
+      <span>K</span>
+      <input type="range" min="-2" max="2" step="0.05" id="ks">
+      <span class="kval" id="kl"></span>
+      <div class="presets" id="presets">
+        <button data-k="0.01">1/100</button>
+        <button data-k="0.1">1/10</button>
+        <button data-k="1">1</button>
+        <button data-k="10">10</button>
+        <button data-k="100">100</button>
+      </div>
+    </div>
+    <canvas class="parts" id="pc" width="900" height="320"></canvas>
+    <div class="rates">
+      <div class="rate"><span class="lbl">forward A &#8594; B</span><div class="bar"><div class="fill" id="fb" style="background:#1D9E75;width:0%"></div></div><span class="num" id="fn"></span></div>
+      <div class="rate"><span class="lbl">reverse B &#8594; A</span><div class="bar"><div class="fill" id="rb" style="background:#8A887F;width:0%"></div></div><span class="num" id="rn"></span></div>
+    </div>
+    <div class="comp"><div id="ca" style="background:#8A887F;width:100%"></div><div id="cb" style="background:#1D9E75;width:0%"></div></div>
+    <div class="read">
+      <span>A <b id="na"></b> &middot; B <b id="nb"></b></span>
+      <span>B : A <b id="ra"></b></span>
+      <span>product <b id="pb"></b></span>
+      <span>flips/s <b id="fl"></b></span>
+    </div>
+    <canvas class="plot" id="tc" width="900" height="170"></canvas>
+    <div class="btns">
+      <button data-a="ra">Restart: all reactant</button>
+      <button data-a="rb">Restart: all product</button>
+      <button data-a="addb">Add product</button>
+      <button data-a="adda">Add reactant</button>
+      <label class="chk"><input type="checkbox" id="dr"> drain product</label>
+    </div>
+  </div>
+
+  <p class="legend">
+    <span class="dot" style="background:#8A887F"></span>reactant A &nbsp;
+    <span class="dot" style="background:#1D9E75"></span>product B &nbsp;
+    <span class="dot" style="background:#fff;border:2px solid #D85A30;box-sizing:border-box"></span>just flipped
+    &nbsp;&middot;&nbsp; dashed line = where K says the mixture settles (fraction of product = K / (1 + K))
+    &nbsp;&middot;&nbsp; <b>Drain product</b> removes product and resupplies reactant, like the lungs exhaling CO&#8322;: forward stays ahead of reverse and the system holds a steady state without ever reaching equilibrium.
+  </p>
+</div>
+
+<script>
+var N = 120, COLS = 15, ROWS = 8, S = 0.025, DRAIN = 0.04;
+var P = {
+  K: 1, kf: 0, kr: 0,
+  st: new Uint8Array(N), fl: new Uint8Array(N),
+  hist: [], flips: [], drain: false,
+  pc: document.getElementById('pc').getContext('2d'),
+  tc: document.getElementById('tc').getContext('2d')
+};
+function el(id) { return document.getElementById(id); }
+
+function fmtK(K) {
+  if (K >= 1) { return (K >= 10) ? String(Math.round(K)) : K.toFixed(1); }
+  var inv = 1 / K;
+  return '1/' + ((inv >= 10) ? String(Math.round(inv)) : inv.toFixed(1));
+}
+
+function setK(K) {
+  P.K = K;
+  P.kf = S * K / (1 + K);
+  P.kr = S / (1 + K);
+  el('kl').textContent = 'K = ' + fmtK(K);
+  var lean = (K > 1.5) ? 'Lies to the right' : (K < 1 / 1.5) ? 'Lies to the left' : 'Roughly balanced';
+  el('lean').textContent = lean;
+  var eq = K / (1 + K);
+  el('pred').innerHTML = 'K = ' + fmtK(K) + ' \u2192 settles at <b>' + Math.round(eq * 100) + '% product</b>';
+  var bs = el('presets').querySelectorAll('button');
+  for (var i = 0; i < bs.length; i++) {
+    var kv = parseFloat(bs[i].getAttribute('data-k'));
+    if (Math.abs(Math.log10(kv) - Math.log10(K)) < 0.03) bs[i].classList.add('on'); else bs[i].classList.remove('on');
+  }
+}
+
+var slider = el('ks');
+slider.addEventListener('input', function () { setK(Math.pow(10, parseFloat(slider.value))); });
+el('presets').addEventListener('click', function (e) {
+  var k = e.target.getAttribute('data-k');
+  if (!k) return;
+  slider.value = Math.log10(parseFloat(k));
+  setK(parseFloat(k));
+});
+el('dr').addEventListener('change', function (e) { P.drain = e.target.checked; });
+document.querySelector('.btns').addEventListener('click', function (e) {
+  var a = e.target.getAttribute('data-a');
+  if (!a) return;
+  if (a === 'ra') { P.st.fill(0); P.hist = []; }
+  if (a === 'rb') { P.st.fill(1); P.hist = []; }
+  if (a === 'addb') { convert(0, 1, 30); }
+  if (a === 'adda') { convert(1, 0, 30); }
+});
+
+function convert(from, to, n) {
+  var idx = [];
+  for (var k = 0; k < N; k++) { if (P.st[k] === from) idx.push(k); }
+  for (var j = idx.length - 1; j > 0; j--) {
+    var r = Math.floor(Math.random() * (j + 1));
+    var t = idx[j]; idx[j] = idx[r]; idx[r] = t;
+  }
+  var m = Math.min(n, idx.length);
+  for (var q = 0; q < m; q++) { P.st[idx[q]] = to; P.fl[idx[q]] = 6; }
+}
+
+function step() {
+  var flips = 0, nA = 0, nB = 0;
+  for (var k = 0; k < N; k++) {
+    if (P.st[k] === 0) {
+      if (Math.random() < P.kf) { P.st[k] = 1; P.fl[k] = 6; flips++; }
+    } else {
+      if (Math.random() < P.kr) { P.st[k] = 0; P.fl[k] = 6; flips++; }
+      else if (P.drain && Math.random() < DRAIN) { P.st[k] = 0; }
+    }
+  }
+  for (var m = 0; m < N; m++) { if (P.st[m] === 0) nA++; else nB++; }
+  P.flips.push(flips); if (P.flips.length > 10) P.flips.shift();
+  P.hist.push(nB / N); if (P.hist.length > 240) P.hist.shift();
+
+  var fwd = P.kf * nA, rev = P.kr * nB, mx = S * N;
+  el('fb').style.width = (fwd / mx * 100).toFixed(1) + '%';
+  el('rb').style.width = (rev / mx * 100).toFixed(1) + '%';
+  el('fn').textContent = fwd.toFixed(2) + ' /step';
+  el('rn').textContent = rev.toFixed(2) + ' /step';
+  el('ca').style.width = (nA / N * 100).toFixed(1) + '%';
+  el('cb').style.width = (nB / N * 100).toFixed(1) + '%';
+  el('na').textContent = nA;
+  el('nb').textContent = nB;
+  el('pb').textContent = Math.round(nB / N * 100) + '%';
+  var ratio;
+  if (nB === 0) ratio = 'all A';
+  else if (nA === 0) ratio = 'all B';
+  else if (nB >= nA) { var r1 = nB / nA; ratio = (r1 >= 10 ? Math.round(r1) : r1.toFixed(1)) + ' : 1'; }
+  else { var r2 = nA / nB; ratio = '1 : ' + (r2 >= 10 ? Math.round(r2) : r2.toFixed(1)); }
+  el('ra').textContent = ratio;
+  var sum = 0; for (var s = 0; s < P.flips.length; s++) sum += P.flips[s];
+  el('fl').textContent = sum;
+
+  drawParts();
+  drawPlot();
+}
+
+function drawParts() {
+  var c = P.pc;
+  c.clearRect(0, 0, 900, 320);
+  var cw = 900 / COLS, ch = 320 / ROWS;
+  for (var k = 0; k < N; k++) {
+    var col = k % COLS, row = Math.floor(k / COLS);
+    var x = (col + 0.5) * cw, y = (row + 0.5) * ch;
+    c.beginPath();
+    c.arc(x, y, 13, 0, Math.PI * 2);
+    c.fillStyle = (P.st[k] === 0) ? '#8A887F' : '#1D9E75';
+    c.fill();
+    if (P.fl[k] > 0) {
+      c.beginPath();
+      c.arc(x, y, 17, 0, Math.PI * 2);
+      c.strokeStyle = '#D85A30';
+      c.lineWidth = 3;
+      c.globalAlpha = P.fl[k] / 6;
+      c.stroke();
+      c.globalAlpha = 1;
+      P.fl[k]--;
+    }
+  }
+}
+
+function drawPlot() {
+  var c = P.tc, W = 900, H = 170, x0 = 60, x1 = 884, yTop = 22, yBot = 150;
+  c.clearRect(0, 0, W, H);
+  c.strokeStyle = '#E7E5DC'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(x0, yTop); c.lineTo(x0, yBot); c.lineTo(x1, yBot); c.stroke();
+  c.fillStyle = '#8A887F'; c.font = '20px sans-serif'; c.textAlign = 'right'; c.textBaseline = 'middle';
+  c.fillText('100%', x0 - 8, yTop);
+  c.fillText('0%', x0 - 8, yBot);
+  c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+  c.fillText('% product over time', x0 + 6, yTop - 4);
+  var eq = P.K / (1 + P.K);
+  var yEq = yBot - eq * (yBot - yTop);
+  c.setLineDash([6, 6]); c.strokeStyle = '#B4B2A9';
+  c.beginPath(); c.moveTo(x0, yEq); c.lineTo(x1, yEq); c.stroke();
+  c.setLineDash([]);
+  if (P.hist.length > 1) {
+    c.strokeStyle = '#1D9E75'; c.lineWidth = 3;
+    c.beginPath();
+    for (var k = 0; k < P.hist.length; k++) {
+      var x = x0 + k * (x1 - x0) / 239;
+      var y = yBot - P.hist[k] * (yBot - yTop);
+      if (k === 0) c.moveTo(x, y); else c.lineTo(x, y);
+    }
+    c.stroke();
+  }
+}
+
+slider.value = 0;
+setK(1);
+setInterval(step, 100);
+</script>
+</body>
+</html>
