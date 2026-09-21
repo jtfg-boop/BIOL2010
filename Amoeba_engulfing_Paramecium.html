@@ -3,7 +3,8 @@
 <head><title>Video Clip</title></head>
 <body>
   <div id="player"></div>
-
+  <p style="font-size: 64px;">This video shows an Amoeba engulfing a Paramecium via phagocytosis, trapping it in a food vacuole. Lysosomes then fuse with the vacuole and release digestive enzymes that kill and break down the prey.</p>
+</body>
   <script>
     var tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
@@ -11,14 +12,14 @@
     firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
     var player;
-    var endTime = 70; // <-- change this to your stop point, in seconds
+    var endTime = 120; // <-- change this to your stop point, in seconds
 
     function onYouTubeIframeAPIReady() {
       player = new YT.Player('player', {
         height: '630',
         width: '1200',
         videoId: 'GbptpDSHQEM', // <-- your video ID
-        playerVars: { start: 60 }, // <-- your start point, in seconds
+        playerVars: { start: 50 }, // <-- your start point, in seconds
         events: { 'onStateChange': onPlayerStateChange }
       });
     }
