@@ -1,10 +1,39 @@
 <!DOCTYPE html>
 <html>
-<head><title>Amoeba engulfing a Paramecium</title></head>
+<head><title>Video Clip</title></head>
 <body>
-  <iframe width="1200" height="630"
-    src="https://www.youtube.com/embed/GbptpDSHQEM?start=50&end=120"
-    frameborder="0" allow="autoplay; encrypted-media" allowfullscreen>
-  </iframe>
+  <div id="player"></div>
+
+  <script>
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    var player;
+    var endTime = 120; // <-- change this to your stop point, in seconds
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        height: '630',
+        width: '1200',
+        videoId: 'GbptpDSHQEM', // <-- your video ID
+        playerVars: { start: 50 }, // <-- your start point, in seconds
+        events: { 'onStateChange': onPlayerStateChange }
+      });
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data == YT.PlayerState.PLAYING) checkTime();
+    }
+
+    function checkTime() {
+      if (player.getCurrentTime() >= endTime) {
+        player.pauseVideo();
+      } else {
+        setTimeout(checkTime, 250);
+      }
+    }
+  </script>
 </body>
 </html>
