@@ -11,14 +11,14 @@
     firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
     var player;
-    var endTime = 10; // <-- change this to your stop point, in seconds
+    var endTime = 70; // <-- change this to your stop point, in seconds
 
     function onYouTubeIframeAPIReady() {
       player = new YT.Player('player', {
         height: '630',
         width: '1200',
         videoId: 'GbptpDSHQEM', // <-- your video ID
-        playerVars: { start: 5 }, // <-- your start point, in seconds
+        playerVars: { start: 60 }, // <-- your start point, in seconds
         events: { 'onStateChange': onPlayerStateChange }
       });
     }
