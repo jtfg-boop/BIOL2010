@@ -1,10 +1,40 @@
+
 <!DOCTYPE html>
 <html>
 <head><title>Video Clip</title></head>
 <body>
-  <iframe width="1200" height="630"
-    src="https://www.youtube.com/embed/UIRhq5_hlfU?start=1565&end=1800"
-    frameborder="0" allow="autoplay; encrypted-media" allowfullscreen>
-  </iframe>
+  <div id="player"></div>
+  <p style="font-size: 4em;"><i>Volvox</i> is a colonial green alga made up of hundreds to thousands of cells arranged in a hollow sphere, and it demonstrates one of the simplest examples of cell specialization in nature. Most of the cells are small, flagellated somatic cells that cover the colony's surface — each has two flagella and often a light-sensing eyespot, and together they beat in coordination to move the colony toward light for photosynthesis. These somatic cells cannot reproduce. A much smaller number of larger, non-flagellated cells called gonidia sit toward the interior of the colony; these are the only cells capable of dividing to produce new daughter colonies. This division between cells specialized for survival and movement versus cells specialized for reproduction is called germline-soma differentiation, and it makes Volvox an important model organism for studying how complex multicellular life evolved from single-celled ancestors.</body>
+  <script>
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    var player;
+    var endTime = 1663; // <-- change this to your stop point, in seconds
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        height: '630',
+        width: '1200',
+        videoId: 'UIRhq5_hlfU', // <-- your video ID
+        playerVars: { start: 1570 }, // <-- your start point, in seconds
+        events: { 'onStateChange': onPlayerStateChange }
+      });
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data == YT.PlayerState.PLAYING) checkTime();
+    }
+
+    function checkTime() {
+      if (player.getCurrentTime() >= endTime) {
+        player.pauseVideo();
+      } else {
+        setTimeout(checkTime, 250);
+      }
+    }
+  </script>
 </body>
 </html>
