@@ -1,1 +1,40 @@
 
+<!DOCTYPE html>
+<html>
+<head><title>Video Clip</title></head>
+<body>
+  <div id="player"></div>
+  <p style="font-size: 4em;">This video shows a white blood cell (phagocyte) using chemotaxis to detect and follow a bacterium. The bacterium is engulfed via phagocytosis, forming a phagosome. Lysosomes fuse with the phagosome to release digestive enzymes and other antimicrobial agents that kill and break down the bacterium. The other cells present are red blood cells.</body>
+  <script>
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    var player;
+    var endTime = 189; // <-- change this to your stop point, in seconds
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        height: '630',
+        width: '1200',
+        videoId: 'GbptpDSHQEM', // <-- your video ID
+        playerVars: { start: 166 }, // <-- your start point, in seconds
+        events: { 'onStateChange': onPlayerStateChange }
+      });
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data == YT.PlayerState.PLAYING) checkTime();
+    }
+
+    function checkTime() {
+      if (player.getCurrentTime() >= endTime) {
+        player.pauseVideo();
+      } else {
+        setTimeout(checkTime, 250);
+      }
+    }
+  </script>
+</body>
+</html>
