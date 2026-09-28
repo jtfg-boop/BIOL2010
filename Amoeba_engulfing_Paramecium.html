@@ -31,7 +31,9 @@
         videoId: videoId,
         playerVars: {
           start: startTime,
-          playsinline: 1
+          end: endTime,      // YouTube stops the video here by itself
+          playsinline: 1,
+          rel: 0
         },
         events: { 'onStateChange': onPlayerStateChange }
       });
@@ -45,12 +47,13 @@
       }
     }
 
+    // Backup check: pauses at endTime and rewinds to startTime
     function startChecking() {
-      stopChecking(); // make sure only one timer runs at a time
+      stopChecking();
       timer = setInterval(function () {
         if (player.getCurrentTime() >= endTime) {
           player.pauseVideo();
-          player.seekTo(startTime, true); // pressing play again replays the clip
+          player.seekTo(startTime, true);
           stopChecking();
         }
       }, 250);
