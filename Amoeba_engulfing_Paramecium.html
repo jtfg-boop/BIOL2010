@@ -19,4 +19,49 @@
     var player;
     var timer = null;
 
-    // Load the YouTube
+    // Load the YouTube IFrame API
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        height: '630',
+        width: '1200',
+        videoId: videoId,
+        playerVars: {
+          start: startTime,
+          playsinline: 1
+        },
+        events: { 'onStateChange': onPlayerStateChange }
+      });
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data == YT.PlayerState.PLAYING) {
+        startChecking();
+      } else {
+        stopChecking();
+      }
+    }
+
+    function startChecking() {
+      stopChecking(); // make sure only one timer runs at a time
+      timer = setInterval(function () {
+        if (player.getCurrentTime() >= endTime) {
+          player.pauseVideo();
+          player.seekTo(startTime, true); // pressing play again replays the clip
+          stopChecking();
+        }
+      }, 250);
+    }
+
+    function stopChecking() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    }
+  </script>
+</body>
+</html>
