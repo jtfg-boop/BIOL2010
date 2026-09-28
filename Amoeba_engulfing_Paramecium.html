@@ -1,41 +1,22 @@
 <!DOCTYPE html>
-<html>
-<head><title>Video Clip</title></head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video Clip</title>
+</head>
 <body>
   <div id="player"></div>
+
   <p style="font-size: 4em;">An amoeba is a single-celled organism (protist) that moves by extrusions of the cell membrane called pseudopods ("false feet"). Other cells, even animal white blood cells, can move in similar ways through amoeboid movement.</p>
   <p style="font-size: 4em;">This video shows an amoeba engulfing a <i>Paramecium</i> via phagocytosis, trapping it in a food vacuole. Lysosomes then fuse with the vacuole and release digestive enzymes that kill and break down the prey.</p>
-</body>
+
   <script>
-    var tag = document.createElement('script');
-    tag.src = "https://www.youtube.com/iframe_api";
-    var firstScriptTag = document.getElementsByTagName('script')[0];
-    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    var startTime = 50;   // <-- start point, in seconds
+    var endTime = 120;    // <-- stop point, in seconds
+    var videoId = 'GbptpDSHQEM'; // <-- your video ID
 
     var player;
-    var endTime = 120; // <-- change this to your stop point, in seconds
+    var timer = null;
 
-    function onYouTubeIframeAPIReady() {
-      player = new YT.Player('player', {
-        height: '630',
-        width: '1200',
-        videoId: 'GbptpDSHQEM', // <-- your video ID
-        playerVars: { start: 50 }, // <-- your start point, in seconds
-        events: { 'onStateChange': onPlayerStateChange }
-      });
-    }
-
-    function onPlayerStateChange(event) {
-      if (event.data == YT.PlayerState.PLAYING) checkTime();
-    }
-
-    function checkTime() {
-      if (player.getCurrentTime() >= endTime) {
-        player.pauseVideo();
-      } else {
-        setTimeout(checkTime, 250);
-      }
-    }
-  </script>
-</body>
-</html>
+    // Load the YouTube
