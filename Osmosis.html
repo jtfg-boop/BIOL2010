@@ -1,0 +1,752 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Osmosis — free water, hydration shells and the water column</title>
+<style>
+  :root {
+    --water: #2F6FB3;
+    --liquid: #EAF3FB;
+    --membrane: #8C6D4F;
+    --sucrose: #D9A441;
+    --sucrose-dark: #7A5A14;
+    --ink: #1C2430;
+    --muted: #5E6A78;
+    --line: #D6DEE8;
+    --paper: #FFFFFF;
+    --focus: #1F6FB5;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink);
+    font-family: "Source Sans 3", "Segoe UI", "Helvetica Neue", Arial, system-ui, sans-serif;
+    font-size: 17px; line-height: 1.45; }
+  header { padding: 22px 28px 6px; max-width: 1360px; margin: 0 auto; }
+  h1 { font-size: 1.75rem; font-weight: 650; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); max-width: 72ch; }
+  main { max-width: 1360px; margin: 0 auto; padding: 10px 28px 36px;
+    display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(300px, 1fr); gap: 22px 30px; }
+  .sim { grid-column: 1; }
+  .controls { grid-column: 2; grid-row: 1 / span 2; }
+  .charts { grid-column: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  canvas { display: block; width: 100%; height: auto; }
+  #tube { border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .status { margin: 12px 0 0; padding: 12px 16px; border-left: 4px solid var(--water);
+    background: #F4F8FC; min-height: 3.2em; font-size: 1.05rem; }
+  .status.eq { border-left-color: var(--sucrose-dark); background: #FBF6EC; }
+  .status b { font-weight: 650; }
+  .chart-box { border: 1px solid var(--line); border-radius: 6px; padding: 10px 10px 6px; }
+  .chart-box h2 { font-size: 0.95rem; font-weight: 600; margin: 0 0 4px 4px; color: var(--muted); }
+
+  /* controls */
+  .controls h2 { font-size: 1rem; font-weight: 650; margin: 14px 0 8px; color: var(--ink); }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+  button { font: inherit; font-size: 0.95rem; padding: 8px 12px; border-radius: 6px;
+    border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
+  button:hover { border-color: var(--water); }
+  button.primary { background: var(--water); color: #fff; border-color: var(--water); font-weight: 600; padding: 10px 18px; font-size: 1.05rem; }
+  button.primary:hover { background: #255b95; }
+  .run { display: flex; gap: 10px; align-items: center; margin: 14px 0 4px; }
+  .run .time { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ctl { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; margin: 10px 0; }
+  .ctl label { font-size: 1rem; }
+  .ctl output { font-variant-numeric: tabular-nums; font-weight: 650; min-width: 3.5ch; text-align: right; }
+  .ctl input[type=range] { grid-column: 1 / span 2; width: 100%; accent-color: var(--water); height: 28px; }
+  .ctl .hint { grid-column: 1 / span 2; font-size: 0.85rem; color: var(--muted); margin-top: -2px; }
+  .check { display: flex; gap: 10px; align-items: flex-start; margin: 12px 0; font-size: 1rem; }
+  .check input { width: 20px; height: 20px; margin-top: 3px; accent-color: var(--water); }
+  .readout { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px;
+    font-size: 0.95rem; line-height: 1.5; }
+  .readout .L { color: var(--water); font-weight: 650; }
+  .readout .R { color: var(--sucrose-dark); font-weight: 650; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  footer { max-width: 1360px; margin: 0 auto; padding: 0 28px 28px; color: var(--muted); font-size: 0.9rem; }
+  @media (max-width: 980px) {
+    main { grid-template-columns: 1fr; }
+    .sim, .controls, .charts { grid-column: 1; grid-row: auto; }
+    .charts { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Osmosis — why water moves</h1>
+  <p>Water molecules cross the membrane in both directions. The ones held in hydration shells around sucrose are not free to cross, so the side with more free water sends more molecules across — until the rising water column, or a cell wall, pushes back as hard as the free-water difference pulls.</p>
+</header>
+
+<main>
+  <section class="sim" aria-label="Simulation">
+    <canvas id="tube" width="1040" height="560" role="img" aria-label="Two compartments separated by a membrane with pores; water molecules, sucrose molecules with hydration shells, water levels and free-water gauges"></canvas>
+    <p class="status" id="status" aria-live="polite"></p>
+  </section>
+
+  <aside class="controls" aria-label="Controls">
+    <div class="run">
+      <button class="primary" id="btnRun">Start</button>
+      <button id="btnReset">Reset</button>
+      <span class="time" id="time">t = 0.0 s</span>
+    </div>
+
+    <h2>Presets</h2>
+    <div class="presets">
+      <button data-preset="figure">Pure water vs sucrose</button>
+      <button data-preset="equal">Equal sucrose on both sides</button>
+      <button data-preset="both">Sucrose on both sides, unequal</button>
+      <button data-preset="nopressure">No push-back from the column</button>
+      <button data-preset="cell">Rigid wall on the right (plant cell)</button>
+    </div>
+
+    <h2>Solutions</h2>
+    <div class="ctl">
+      <label for="sL">Sucrose molecules, left</label><output id="sLv">0</output>
+      <input type="range" id="sL" min="0" max="12" step="1" value="0">
+    </div>
+    <div class="ctl">
+      <label for="sR">Sucrose molecules, right</label><output id="sRv">4</output>
+      <input type="range" id="sR" min="0" max="12" step="1" value="4">
+    </div>
+    <div class="ctl">
+      <label for="shell">Water molecules per hydration shell</label><output id="shellv">8</output>
+      <input type="range" id="shell" min="0" max="10" step="1" value="8">
+      <span class="hint">Water in a shell is held by the sucrose and cannot cross the membrane.</span>
+    </div>
+    <div class="ctl">
+      <label for="n0">Water molecules per side at the start</label><output id="n0v">48</output>
+      <input type="range" id="n0" min="24" max="96" step="8" value="48">
+      <span class="hint">Changing this resets the run.</span>
+    </div>
+
+    <h2>Membrane and container</h2>
+    <div class="ctl">
+      <label for="perm">Membrane permeability (crossings per second)</label><output id="permv">4</output>
+      <input type="range" id="perm" min="1" max="12" step="1" value="4">
+    </div>
+    <div class="ctl">
+      <label for="beta">Push-back from the water column</label><output id="betav">1.0</output>
+      <input type="range" id="beta" min="0" max="3" step="0.1" value="1">
+      <span class="hint">0 = the column has no weight; higher = the level difference pushes water back harder.</span>
+    </div>
+    <div class="ctl">
+      <label for="speed">Speed of molecular motion</label><output id="speedv">1.0</output>
+      <input type="range" id="speed" min="0.3" max="2.5" step="0.1" value="1">
+      <span class="hint">Only changes how fast the molecules jiggle on screen, not the physics.</span>
+    </div>
+    <label class="check"><input type="checkbox" id="rigid">
+      <span>Rigid wall on the right (plant cell): the volume cannot grow, so pressure builds instead — turgor.</span></label>
+
+    <div class="readout" id="readout"></div>
+  </aside>
+
+  <section class="charts" aria-label="Graphs over time">
+    <div class="chart-box">
+      <h2>Free water (% of water molecules that are free)</h2>
+      <canvas id="chartFree" width="520" height="230"></canvas>
+    </div>
+    <div class="chart-box">
+      <h2 id="chartLevelTitle">Water level (% of the starting level)</h2>
+      <canvas id="chartLevel" width="520" height="230"></canvas>
+    </div>
+  </section>
+</main>
+<footer>BIOL 2010 — Biology I for Majors. Companion to Lab 5 (Osmosis in onion epidermis cells). The model counts molecules: a side sends water across in proportion to its free-water concentration plus the pressure on it; the hydration shell holds a fixed number of water molecules per sucrose. Molecules move by random (Brownian) motion, and only a molecule that happens to be near a pore can slip through it.</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  // ------------------------------------------------------------ parameters & state
+  const P = { N0: 48, SL: 0, SR: 4, shell: 8, perm: 4, beta: 1.0, rigid: false, speed: 1.0 };
+  const WALL_STIFFNESS = 8;        // pressure per relative volume increase of a rigid cell
+  const S = {
+    NL: 48, NR: 48, t: 0, running: false,
+    accNet: 0, rLR: 0, rRL: 0, net: 0, held: false,
+    pendL: 0, pendR: 0,            // net transfers decided but waiting for a molecule to wander near a pore
+    dotsL: [], dotsR: [], solL: [], solR: [], travelers: [],
+    history: [], lastSample: -1
+  };
+  const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ------------------------------------------------------------ geometry (canvas units)
+  const W = 1040, H = 560;
+  const box = { left: 40, right: 1000, top: 60, bottom: 400 };   // container interior
+  const memb = { x0: 508, x1: 532 };                             // membrane bar
+  const pores = [{ y: 205, h: 26 }, { y: 290, h: 26 }, { y: 372, h: 26 }];
+  const H0 = 230;                                                // initial liquid height (px)
+  const DOT_R = 5.5, SHELL_R = 21;
+  const sideL = { x0: box.left + 8, x1: memb.x0 - 8 };
+  const sideR = { x0: memb.x1 + 8, x1: box.right - 8 };
+  // Brownian motion: Ornstein–Uhlenbeck velocity with correlation time TAU and noise SIG
+  const TAU = 0.35, SIG0 = (reducedMotion ? 0.45 : 1) * 150;
+  const SIG = () => SIG0 * P.speed;
+  const CAPTURE = 150;            // a molecule must be within this distance of a pore to be the one that slips through
+  const CROSS_SPEED = 65;         // px/s inside the pore
+
+  // ------------------------------------------------------------ derived quantities
+  function derive(nl, nr) {
+    if (nl === undefined) { nl = S.NL; nr = S.NR; }
+    const boundL = Math.min(nl, P.shell * P.SL), boundR = Math.min(nr, P.shell * P.SR);
+    const freeL = nl - boundL, freeR = nr - boundR;
+    const cL = nl > 0 ? freeL / nl : 0, cR = nr > 0 ? freeR / nr : 0;
+    const levelL = nl / P.N0;
+    const levelR = P.rigid ? 1 : nr / P.N0;
+    const PL = P.beta * (levelL - 1);
+    const PR = P.rigid ? Math.max(0, WALL_STIFFNESS * (nr - P.N0) / P.N0) : P.beta * (levelR - 1);
+    return { boundL, boundR, freeL, freeR, cL, cR, levelL, levelR, PL, PR };
+  }
+  function netRate(d) { return P.perm * (Math.max(0, d.cL + d.PL) - Math.max(0, d.cR + d.PR)); }
+  // counts including transfers already decided but not yet physically across the membrane
+  function committedCounts() {
+    let nl = S.NL, nr = S.NR;
+    for (const tr of S.travelers) if (!tr.exchange && tr.phase === 'approach') { if (tr.from === 'L') { nl--; nr++; } else { nr--; nl++; } }
+    nl -= S.pendL; nr += S.pendL; nr -= S.pendR; nl += S.pendR;
+    return { nl, nr };
+  }
+
+  // liquid surface y for a given relative level (clamped to the container)
+  function surfaceY(level) {
+    const h = Math.min(H0 * level, box.bottom - box.top - 6);
+    return box.bottom - h;
+  }
+  function usablePores() {
+    const d = derive();
+    const yMax = Math.max(surfaceY(d.levelL), surfaceY(d.levelR));
+    const u = pores.filter(p => p.y - p.h / 2 > yMax + 2);
+    return u.length ? u : [pores[pores.length - 1]];
+  }
+  // smallest number of water molecules that keeps the lowest pore under water
+  function minWater() {
+    const pl = pores[pores.length - 1];
+    const level = (box.bottom - (pl.y - pl.h / 2 - 3)) / H0;
+    return Math.ceil(level * P.N0 + 1e-9);
+  }
+  function entrance(from, pore) { return { x: from === 'L' ? memb.x0 - DOT_R - 2 : memb.x1 + DOT_R + 2, y: pore.y }; }
+
+  // ------------------------------------------------------------ particles
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function gauss() { return (Math.random() + Math.random() + Math.random() - 1.5) * 2; }
+
+  function makeDot(side, yTop) {
+    const b = side === 'L' ? sideL : sideR;
+    return { x: rnd(b.x0 + DOT_R, b.x1 - DOT_R), y: rnd(yTop + DOT_R + 2, box.bottom - DOT_R - 2), vx: gauss() * 40, vy: gauss() * 40 };
+  }
+  function makeSolute(side, yTop, others) {
+    const b = side === 'L' ? sideL : sideR;
+    let best = null;
+    for (let i = 0; i < 30; i++) {
+      const c = { x: rnd(b.x0 + SHELL_R + 8, b.x1 - SHELL_R - 8), y: rnd(yTop + SHELL_R + 10, box.bottom - SHELL_R - 8), vx: rnd(-6, 6), vy: rnd(-6, 6), phase: rnd(0, Math.PI * 2) };
+      let minD = Infinity;
+      for (const o of others) minD = Math.min(minD, Math.hypot(o.x - c.x, o.y - c.y));
+      if (!best || minD > best.d) best = { c, d: minD };
+      if (minD > 2.4 * SHELL_R) break;
+    }
+    return best.c;
+  }
+
+  // make the visible dots agree with the counts (travelers are counted on the side they belong to)
+  function reconcile() {
+    const d = derive();
+    const yL = surfaceY(d.levelL), yR = surfaceY(d.levelR);
+    while (S.solL.length < P.SL) S.solL.push(makeSolute('L', yL, S.solL));
+    while (S.solL.length > P.SL) S.solL.pop();
+    while (S.solR.length < P.SR) S.solR.push(makeSolute('R', yR, S.solR));
+    while (S.solR.length > P.SR) S.solR.pop();
+    const owned = { L: 0, R: 0 };
+    for (const tr of S.travelers) owned[tr.side]++;
+    fixDots('L', S.dotsL, d.freeL - owned.L, yL);
+    fixDots('R', S.dotsR, d.freeR - owned.R, yR);
+  }
+  function fixDots(side, dots, want, yTop) {
+    want = Math.max(0, Math.round(want));
+    while (dots.length < want) dots.push(makeDot(side, yTop));
+    while (dots.length > want) dots.splice(Math.floor(Math.random() * dots.length), 1);
+  }
+
+  function reset() {
+    S.NL = P.N0; S.NR = P.N0; S.t = 0; S.accNet = 0; S.net = 0; S.held = false; S.rLR = 0; S.rRL = 0; S.pendL = 0; S.pendR = 0;
+    S.dotsL = []; S.dotsR = []; S.solL = []; S.solR = []; S.travelers = [];
+    S.history = []; S.lastSample = -1;
+    reconcile();
+    sample();
+    draw();
+  }
+
+  // free molecules close enough to a pore on this side
+  function candidates(from, poreList) {
+    const dots = from === 'L' ? S.dotsL : S.dotsR;
+    const out = [];
+    for (let i = 0; i < dots.length; i++) {
+      for (const p of poreList) {
+        const e = entrance(from, p);
+        const dd = Math.hypot(dots[i].x - e.x, dots[i].y - e.y);
+        if (dd < CAPTURE) out.push({ i, p, w: 1 / (dd + 25) });
+      }
+    }
+    return out;
+  }
+  // start a crossing: a nearby molecule wanders to the pore, slips through, and continues on the other side
+  let pairSeq = 0;
+  function tryLaunch(from, exchange, poreList, pairId) {
+    const cands = candidates(from, poreList || usablePores());
+    if (!cands.length) return false;
+    let total = 0; for (const c of cands) total += c.w;
+    let r = Math.random() * total, pick = cands[cands.length - 1];
+    for (const c of cands) { r -= c.w; if (r <= 0) { pick = c; break; } }
+    const dots = from === 'L' ? S.dotsL : S.dotsR;
+    const dot = dots.splice(pick.i, 1)[0];
+    S.travelers.push({ from, to: from === 'L' ? 'R' : 'L', exchange, pairId, flipped: false, side: from, phase: 'approach', pore: pick.p,
+      x: dot.x, y: dot.y, vx: dot.vx, vy: dot.vy, age: 0 });
+    return true;
+  }
+  // a balanced exchange: one molecule each way, no net change
+  function tryLaunchPair() {
+    const u = usablePores();
+    const a = u[Math.floor(Math.random() * u.length)];
+    const b = u.length > 1 ? u.filter(p => p !== a)[Math.floor(Math.random() * (u.length - 1))] : a;
+    if (!candidates('L', [a]).length || !candidates('R', [b]).length) return;
+    const id = ++pairSeq;
+    tryLaunch('L', true, [a], id); tryLaunch('R', true, [b], id);
+  }
+
+  function updateTravelers(dt) {
+    const d = derive();
+    for (let i = S.travelers.length - 1; i >= 0; i--) {
+      const tr = S.travelers[i];
+      tr.age += dt;
+      let e = entrance(tr.from, tr.pore);
+      let gapHalf = tr.pore.h / 2 - DOT_R - 1;
+      if (tr.phase === 'approach') {
+        const u = usablePores();
+        if (!u.includes(tr.pore)) tr.pore = u[u.length - 1];           // its pore is no longer under water: use a lower one
+        if (tr.age > 8) {                                                // could not get there: give the molecule back to its side
+          const dots = tr.from === 'L' ? S.dotsL : S.dotsR;
+          dots.push({ x: tr.x, y: tr.y, vx: tr.vx, vy: tr.vy });
+          S.travelers.splice(i, 1);
+          continue;
+        }
+        e = entrance(tr.from, tr.pore); gapHalf = tr.pore.h / 2 - DOT_R - 1;
+        // Brownian motion with a gentle pull toward the pore opening (stronger the longer it takes)
+        const K = 6 + Math.min(14, tr.age * 4);
+        tr.vx += (e.x - tr.x) * K * dt - tr.vx / TAU * dt + 0.5 * SIG() * gauss() * Math.sqrt(dt);
+        tr.vy += (e.y - tr.y) * K * dt - tr.vy / TAU * dt + 0.5 * SIG() * gauss() * Math.sqrt(dt);
+        tr.x += tr.vx * dt; tr.y += tr.vy * dt;
+        const yTop = surfaceY(tr.from === 'L' ? d.levelL : d.levelR);
+        if (tr.y < yTop + DOT_R) { tr.y = yTop + DOT_R; tr.vy = Math.abs(tr.vy); }
+        if (tr.y > box.bottom - DOT_R) { tr.y = box.bottom - DOT_R; tr.vy = -Math.abs(tr.vy); }
+        if (tr.from === 'L' && tr.x > e.x) tr.x = e.x;
+        if (tr.from === 'R' && tr.x < e.x) tr.x = e.x;
+        if (Math.abs(tr.y - tr.pore.y) < gapHalf && Math.abs(tr.x - e.x) < 4) {
+          tr.phase = 'cross';
+          tr.vx = (tr.to === 'R' ? 1 : -1) * CROSS_SPEED; tr.vy = 0;
+          if (!tr.exchange) {                      // the water actually changes sides now
+            if (tr.from === 'L') { S.NL--; S.NR++; } else { S.NR--; S.NL++; }
+            tr.side = tr.to;
+          } else {                                 // an exchange pair swaps sides in the books when the first of the two crosses
+            for (const o of S.travelers) if (o.exchange && o.pairId === tr.pairId && !o.flipped) { o.side = o.to; o.flipped = true; }
+          }
+        }
+      } else {                                      // inside the pore
+        tr.x += tr.vx * dt;
+        tr.y += 10 * gauss() * Math.sqrt(dt);
+        tr.y = Math.max(tr.pore.y - gapHalf, Math.min(tr.pore.y + gapHalf, tr.y));
+        const exitX = tr.to === 'R' ? memb.x1 + DOT_R + 2 : memb.x0 - DOT_R - 2;
+        if ((tr.to === 'R' && tr.x >= exitX) || (tr.to === 'L' && tr.x <= exitX)) {
+          const dots = tr.to === 'L' ? S.dotsL : S.dotsR;
+          const yTop = surfaceY(tr.to === 'L' ? d.levelL : d.levelR);
+          dots.push({ x: tr.x, y: Math.max(yTop + DOT_R + 2, Math.min(box.bottom - DOT_R - 2, tr.y)), vx: tr.vx * 0.8, vy: gauss() * 30 });
+          S.travelers.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ physics step
+  function step(dt) {
+    const c = committedCounts();
+    const dc = derive(c.nl, c.nr);
+    // each side sends water in proportion to (free-water fraction + pressure on that side)
+    S.rLR = P.perm * Math.max(0, dc.cL + dc.PL);
+    S.rRL = P.perm * Math.max(0, dc.cR + dc.PR);
+    S.net = S.rLR - S.rRL;
+    if (S.running) {
+      S.t += dt;
+      // net movement: decided one molecule at a time; a molecule moves only if that brings the net rate closer to zero
+      S.accNet += S.net * dt;
+      if (S.accNet >= 1) {
+        if (dc.freeL > 0 && S.pendL < 4 && c.nl - 1 >= minWater() && Math.abs(netRate(derive(c.nl - 1, c.nr + 1))) < Math.abs(S.net)) { S.pendL++; S.accNet -= 1; S.held = false; }
+        else { S.accNet = 0; S.held = true; }
+      } else if (S.accNet <= -1) {
+        if (dc.freeR > 0 && S.pendR < 4 && (P.rigid || c.nr - 1 >= minWater()) && Math.abs(netRate(derive(c.nl + 1, c.nr - 1))) < Math.abs(S.net)) { S.pendR++; S.accNet += 1; S.held = false; }
+        else { S.accNet = 0; S.held = true; }
+      }
+      // decided transfers start as soon as a free molecule happens to be near a pore
+      while (S.pendL > 0 && tryLaunch('L', false)) S.pendL--;
+      while (S.pendR > 0 && tryLaunch('R', false)) S.pendR--;
+      // the balanced part of the two-way traffic: pairs crossing in opposite directions
+      const exchange = Math.min(S.rLR, S.rRL);
+      if (Math.random() < exchange * dt) tryLaunchPair();
+    }
+    updateTravelers(dt);
+    reconcile();
+    const d2 = derive();
+    jitter(S.dotsL, 'L', surfaceY(d2.levelL), dt, 1);
+    jitter(S.dotsR, 'R', surfaceY(d2.levelR), dt, 1);
+    jitter(S.solL, 'L', surfaceY(d2.levelL), dt, 0.15, SHELL_R + 2);
+    jitter(S.solR, 'R', surfaceY(d2.levelR), dt, 0.15, SHELL_R + 2);
+    if (S.running) sample();
+  }
+  // Brownian motion confined to the liquid; water molecules may jostle into the pore openings and come back
+  function jitter(list, side, yTop, dt, k, margin) {
+    const b = side === 'L' ? sideL : sideR;
+    const m = margin || DOT_R + 1;
+    const isWater = !margin;
+    const u = isWater ? usablePores() : null;
+    const sq = Math.sqrt(dt);
+    for (const o of list) {
+      o.vx += -o.vx / TAU * dt + SIG() * k * gauss() * sq;
+      o.vy += -o.vy / TAU * dt + SIG() * k * gauss() * sq;
+      o.x += o.vx * dt; o.y += o.vy * dt;
+      // outer wall
+      if (side === 'L' && o.x < b.x0 + m) { o.x = b.x0 + m; o.vx = Math.abs(o.vx); }
+      if (side === 'R' && o.x > b.x1 - m) { o.x = b.x1 - m; o.vx = -Math.abs(o.vx); }
+      // membrane face, with pockets at the pores for water molecules
+      const face = side === 'L' ? memb.x0 - m : memb.x1 + m;
+      let limit = face;
+      if (isWater) {
+        for (const p of u) if (Math.abs(o.y - p.y) < p.h / 2 - m) { limit = (memb.x0 + memb.x1) / 2 + (side === 'L' ? -2 : 2); break; }
+      }
+      if (side === 'L' && o.x > limit) { o.x = limit; o.vx = -Math.abs(o.vx); }
+      if (side === 'R' && o.x < limit) { o.x = limit; o.vx = Math.abs(o.vx); }
+      if (o.y < yTop + m) { o.y = yTop + m; o.vy = Math.abs(o.vy); }
+      if (o.y > box.bottom - m) { o.y = box.bottom - m; o.vy = -Math.abs(o.vy); }
+      if (o.phase !== undefined) o.phase += 0.25 * dt;
+    }
+  }
+  function sample() {
+    if (S.t - S.lastSample < 0.1 && S.history.length) return;
+    const d = derive();
+    S.history.push({ t: S.t, cL: d.cL, cR: d.cR, lL: d.levelL, lR: d.levelR, PR: d.PR, net: S.net });
+    S.lastSample = S.t;
+    if (S.history.length > 4000) S.history = S.history.filter((_, i) => i % 2 === 0);
+  }
+
+  // ------------------------------------------------------------ drawing
+  const cvs = document.getElementById('tube');
+  const ctx = cvs.getContext('2d');
+  const css = getComputedStyle(document.documentElement);
+  const col = n => css.getPropertyValue(n).trim();
+
+  function fitCanvas(c, w, h) {
+    const dpr = window.devicePixelRatio || 1;
+    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    const g = c.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return g;
+  }
+
+  function draw() {
+    const g = fitCanvas(cvs, W, H);
+    const d = derive();
+    g.clearRect(0, 0, W, H);
+    const yL = surfaceY(d.levelL), yR = surfaceY(d.levelR);
+
+    // liquids
+    g.fillStyle = col('--liquid');
+    g.fillRect(box.left, yL, memb.x0 - box.left, box.bottom - yL);
+    g.fillRect(memb.x1, yR, box.right - memb.x1, box.bottom - yR);
+    g.strokeStyle = '#B9D3EA'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(box.left, yL); g.lineTo(memb.x0, yL); g.stroke();
+    g.beginPath(); g.moveTo(memb.x1, yR); g.lineTo(box.right, yR); g.stroke();
+
+    // starting-level reference
+    const y0 = surfaceY(1);
+    g.setLineDash([5, 5]); g.strokeStyle = '#A7B4C2'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(box.left, y0); g.lineTo(box.right, y0); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = '#6B7785'; g.font = '13px sans-serif'; g.textAlign = 'left';
+    g.fillText('starting level', box.left + 6, y0 - 6);
+
+    // level change labels
+    g.font = '600 15px sans-serif'; g.textAlign = 'right';
+    const dl = Math.round((d.levelL - 1) * 100), dr = Math.round((d.levelR - 1) * 100);
+    g.fillStyle = col('--water');
+    if (dl !== 0) g.fillText((dl > 0 ? '+' : '') + dl + ' %', memb.x0 - 12, yL - 8);
+    g.fillStyle = col('--sucrose-dark');
+    if (!P.rigid && dr !== 0) g.fillText((dr > 0 ? '+' : '') + dr + ' %', box.right - 10, yR - 8);
+    if (S.NR / P.N0 * H0 > box.bottom - box.top - 6 && !P.rigid) { g.fillStyle = '#B23A3A'; g.fillText('off scale', box.right - 10, box.top + 16); }
+
+    // container
+    g.strokeStyle = P.rigid ? '#333' : '#222'; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(box.left, box.top - 10); g.lineTo(box.left, box.bottom); g.lineTo(box.right, box.bottom); g.lineTo(box.right, box.top - 10); g.stroke();
+    if (P.rigid) {   // thick cell wall around the right compartment
+      g.strokeStyle = '#4A6B2A'; g.lineWidth = 10;
+      g.strokeRect(memb.x1 - 5, box.top - 10, box.right - memb.x1 + 10, box.bottom - box.top + 10);
+      g.fillStyle = '#4A6B2A'; g.font = '600 14px sans-serif'; g.textAlign = 'center';
+      g.fillText('cell wall (rigid)', (memb.x1 + box.right) / 2, box.top - 18);
+    }
+
+    // membrane with pores (open pores below both surfaces are filled with water)
+    for (const p of usablePores()) { g.fillStyle = col('--liquid'); g.fillRect(memb.x0, p.y - p.h / 2, memb.x1 - memb.x0, p.h); }
+    g.fillStyle = col('--membrane');
+    let yCursor = box.top - 10;
+    for (const p of pores) { g.fillRect(memb.x0, yCursor, memb.x1 - memb.x0, p.y - p.h / 2 - yCursor); yCursor = p.y + p.h / 2; }
+    g.fillRect(memb.x0, yCursor, memb.x1 - memb.x0, box.bottom - yCursor);
+
+    // solutes with hydration shells
+    drawSolutes(g, S.solL, d.boundL);
+    drawSolutes(g, S.solR, d.boundR);
+    // free water
+    g.fillStyle = col('--water');
+    for (const o of S.dotsL) dot(g, o.x, o.y);
+    for (const o of S.dotsR) dot(g, o.x, o.y);
+    // travelers
+    for (const tr of S.travelers) { dot(g, tr.x, tr.y); }
+
+    // gross-rate arrows at the middle pore
+    const pm = pores[1];
+    arrow(g, memb.x0 - 70, pm.y - 7, memb.x1 + 10 + 60 * Math.min(1, S.rLR / 8), pm.y - 7, col('--water'), 2.5);
+    arrow(g, memb.x1 + 70, pm.y + 9, memb.x0 - 10 - 60 * Math.min(1, S.rRL / 8), pm.y + 9, '#5A6672', 2.5);
+    g.font = '13px sans-serif'; g.textAlign = 'center';
+    g.fillStyle = col('--water'); g.fillText(S.rLR.toFixed(1) + ' per s', (memb.x0 + memb.x1) / 2, pm.y - 20);
+    g.fillStyle = '#5A6672'; g.fillText(S.rRL.toFixed(1) + ' per s', (memb.x0 + memb.x1) / 2, pm.y + 30);
+
+    // net arrow above the container
+    const shown = S.net;
+    const netLen = Math.min(260, Math.abs(shown) * 120);
+    const cx = (memb.x0 + memb.x1) / 2, ay = 32;
+    if (netLen > 6 && !S.held) {
+      const dir = shown > 0 ? 1 : -1;
+      arrow(g, cx - dir * netLen / 2, ay, cx + dir * netLen / 2, ay, col('--water'), 5);
+    }
+    g.fillStyle = col('--water'); g.font = '600 16px sans-serif'; g.textAlign = 'center';
+    g.fillText((S.held || Math.abs(shown) < 0.15) ? 'net movement of water ≈ 0' + (S.held ? ' (balanced to within one molecule)' : '') : 'net movement of water: ' + Math.abs(shown).toFixed(1) + ' molecules per s ' + (shown > 0 ? '→' : '←'), cx, 20);
+
+    // side titles
+    g.fillStyle = '#1C2430'; g.font = '600 17px sans-serif';
+    g.textAlign = 'center';
+    g.fillText(P.SL === 0 ? 'Pure water' : 'Sucrose solution', (box.left + memb.x0) / 2, box.top + 8);
+    g.fillText(P.SR === 0 ? 'Pure water' : 'Sucrose solution', (memb.x1 + box.right) / 2, box.top + 8);
+
+    // turgor gauge in rigid mode
+    if (P.rigid) {
+      const gx = box.right - 34, gy0 = box.top + 30, gh = 110, frac = Math.max(0, Math.min(1, d.PR));
+      g.fillStyle = 'rgba(255,255,255,0.85)'; g.fillRect(gx - 56, gy0 - 6, 76, gh + 12);
+      g.fillStyle = '#fff'; g.strokeStyle = '#4A6B2A'; g.lineWidth = 1.5;
+      g.fillRect(gx, gy0, 16, gh); g.strokeRect(gx, gy0, 16, gh);
+      g.fillStyle = '#4A6B2A'; g.fillRect(gx, gy0 + gh * (1 - frac), 16, gh * frac);
+      g.font = '600 12px sans-serif'; g.textAlign = 'right'; g.fillText('turgor', gx - 6, gy0 + 12);
+      g.fillText(d.PR.toFixed(2), gx - 6, gy0 + gh);
+    }
+
+    // free-water gauges
+    gauge(g, (box.left + memb.x0) / 2, 440, d.cL, 'free water: ' + d.freeL + ' of ' + S.NL + ' molecules' + (d.boundL ? ' (' + d.boundL + ' in shells)' : ''), col('--water'));
+    gauge(g, (memb.x1 + box.right) / 2, 440, d.cR, 'free water: ' + d.freeR + ' of ' + S.NR + ' molecules' + (d.boundR ? ' (' + d.boundR + ' in shells)' : ''), col('--water'));
+
+    // legend
+    const ly = 530;
+    g.fillStyle = col('--water'); dot(g, 60, ly);
+    g.fillStyle = '#1C2430'; g.font = '14px sans-serif'; g.textAlign = 'left'; g.fillText('free water molecule', 74, ly + 5);
+    g.setLineDash([3, 3]); g.strokeStyle = '#555'; g.lineWidth = 1; g.beginPath(); g.arc(248, ly, DOT_R + 4, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+    g.fillStyle = col('--water'); dot(g, 248, ly);
+    g.fillStyle = '#1C2430'; g.fillText('water in a hydration shell (not free)', 266, ly + 5);
+    sucroseGlyph(g, 560, ly);
+    g.fillStyle = '#1C2430'; g.fillText('sucrose molecule', 582, ly + 5);
+    g.fillStyle = col('--membrane'); g.fillRect(720, ly - 8, 10, 16);
+    g.fillStyle = '#1C2430'; g.fillText('membrane: water passes through the pores, hydrated sucrose cannot', 738, ly + 5);
+  }
+
+  function dot(g, x, y) { g.beginPath(); g.arc(x, y, DOT_R, 0, Math.PI * 2); g.fill(); }
+  function sucroseGlyph(g, x, y) {
+    g.fillStyle = col('--sucrose'); g.strokeStyle = col('--sucrose-dark'); g.lineWidth = 1.2;
+    g.beginPath(); g.ellipse(x - 5, y, 7.5, 6.5, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.beginPath(); g.ellipse(x + 5.5, y, 6.5, 5.6, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+  }
+  function drawSolutes(g, list, bound) {
+    let remaining = bound;
+    for (const s of list) {
+      const n = Math.max(0, Math.min(P.shell, remaining)); remaining -= n;
+      g.setLineDash([3, 3]); g.strokeStyle = '#6E7883'; g.lineWidth = 1;
+      g.beginPath(); g.arc(s.x, s.y, SHELL_R + DOT_R + 2, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+      sucroseGlyph(g, s.x, s.y);
+      g.fillStyle = col('--water');
+      for (let k = 0; k < n; k++) {
+        const a = s.phase + k * 2 * Math.PI / Math.max(1, P.shell);
+        dot(g, s.x + SHELL_R * Math.cos(a), s.y + SHELL_R * Math.sin(a));
+      }
+    }
+  }
+  function arrow(g, x0, y0, x1, y1, color, w) {
+    const ang = Math.atan2(y1 - y0, x1 - x0), hl = 4 * w;
+    g.strokeStyle = color; g.fillStyle = color; g.lineWidth = w;
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1 - Math.cos(ang) * hl * 0.6, y1 - Math.sin(ang) * hl * 0.6); g.stroke();
+    g.beginPath(); g.moveTo(x1, y1);
+    g.lineTo(x1 - hl * Math.cos(ang - 0.5), y1 - hl * Math.sin(ang - 0.5));
+    g.lineTo(x1 - hl * Math.cos(ang + 0.5), y1 - hl * Math.sin(ang + 0.5)); g.closePath(); g.fill();
+  }
+  function gauge(g, cx, y, frac, label, color) {
+    const w = 300, h = 18, x = cx - w / 2;
+    g.fillStyle = '#fff'; g.strokeStyle = '#222'; g.lineWidth = 1.2;
+    g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h);
+    g.fillStyle = color; g.fillRect(x, y, w * Math.max(0, Math.min(1, frac)), h);
+    g.fillStyle = '#1C2430'; g.font = '600 15px sans-serif'; g.textAlign = 'center';
+    g.fillText(Math.round(frac * 100) + ' %', cx, y + h + 20);
+    g.font = '14px sans-serif'; g.fillText(label, cx, y + h + 40);
+  }
+
+  // ------------------------------------------------------------ charts
+  const cFree = document.getElementById('chartFree'), cLevel = document.getElementById('chartLevel');
+  const CW = 520, CH = 230;
+
+  function drawCharts() {
+    const tmax = Math.max(30, Math.ceil(S.t / 10) * 10);
+    const hist = S.history;
+    // chart 1: free water %
+    lineChart(fitCanvas(cFree, CW, CH), hist, tmax, 0, 100, [
+      { key: h => h.cL * 100, color: col('--water'), label: 'left' },
+      { key: h => h.cR * 100, color: col('--sucrose-dark'), label: 'right' }
+    ], '%');
+    // chart 2: levels (and pressure in rigid mode)
+    let lo = 50, hi = 150;
+    for (const h of hist) { lo = Math.min(lo, h.lL * 100 - 5); hi = Math.max(hi, h.lR * 100 + 5, h.lL * 100 + 5); }
+    lo = Math.max(0, Math.floor(lo / 10) * 10); hi = Math.ceil(hi / 10) * 10;
+    const series = [
+      { key: h => h.lL * 100, color: col('--water'), label: 'left level' },
+      { key: h => h.lR * 100, color: col('--sucrose-dark'), label: 'right level' }
+    ];
+    if (P.rigid) series.push({ key: h => 100 + h.PR * 50, color: '#4A6B2A', label: 'turgor (right)', dash: [5, 4] });
+    document.getElementById('chartLevelTitle').textContent = P.rigid ? 'Water level (% of start) and turgor pressure on the right (dashed)' : 'Water level (% of the starting level)';
+    lineChart(fitCanvas(cLevel, CW, CH), hist, tmax, lo, hi, series, '%', 100);
+  }
+
+  function lineChart(g, hist, tmax, y0, y1, series, unit, refLine) {
+    const m = { l: 46, r: 14, t: 10, b: 30 };
+    const pw = CW - m.l - m.r, ph = CH - m.t - m.b;
+    g.clearRect(0, 0, CW, CH);
+    const X = t => m.l + pw * t / tmax, Y = v => m.t + ph * (1 - (v - y0) / (y1 - y0));
+    // axes & ticks
+    g.strokeStyle = '#C9D3DE'; g.lineWidth = 1; g.fillStyle = '#5E6A78'; g.font = '12px sans-serif';
+    const ystep = (y1 - y0) <= 100 ? 25 : 50;
+    for (let v = y0; v <= y1 + 1e-6; v += ystep) {
+      g.beginPath(); g.moveTo(m.l, Y(v)); g.lineTo(CW - m.r, Y(v)); g.stroke();
+      g.textAlign = 'right'; g.fillText(Math.round(v) + unit, m.l - 6, Y(v) + 4);
+    }
+    const xstep = tmax <= 60 ? 10 : tmax <= 180 ? 30 : 60;
+    g.textAlign = 'center';
+    for (let t = 0; t <= tmax + 1e-6; t += xstep) { g.fillText(t + ' s', X(t), CH - 10); }
+    if (refLine !== undefined && refLine >= y0 && refLine <= y1) {
+      g.setLineDash([4, 4]); g.strokeStyle = '#8A97A5'; g.beginPath(); g.moveTo(m.l, Y(refLine)); g.lineTo(CW - m.r, Y(refLine)); g.stroke(); g.setLineDash([]);
+    }
+    // series
+    for (const s of series) {
+      g.strokeStyle = s.color; g.lineWidth = 2.5; g.setLineDash(s.dash || []);
+      g.beginPath();
+      hist.forEach((h, i) => { const x = X(h.t), y = Y(Math.max(y0, Math.min(y1, s.key(h)))); if (i === 0) g.moveTo(x, y); else g.lineTo(x, y); });
+      g.stroke(); g.setLineDash([]);
+      if (hist.length) {
+        const last = hist[hist.length - 1];
+        g.fillStyle = s.color; g.font = '600 12px sans-serif'; g.textAlign = 'left';
+        const lx = Math.min(X(last.t) + 6, CW - m.r - 70), ly = Math.max(m.t + 10, Math.min(CH - m.b - 2, Y(Math.max(y0, Math.min(y1, s.key(last)))) + 4));
+        g.fillText(s.label, lx, ly);
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ text readouts
+  const statusEl = document.getElementById('status'), readoutEl = document.getElementById('readout'), timeEl = document.getElementById('time');
+  let lastMsg = '';
+  function trendFlat(window) {
+    // level change over the last `window` seconds, in % of the starting level
+    const h = S.history; if (!h.length) return null;
+    const now = h[h.length - 1];
+    let then = null;
+    for (let i = h.length - 1; i >= 0; i--) { if (now.t - h[i].t >= window) { then = h[i]; break; } }
+    if (!then) return null;
+    return Math.max(Math.abs(now.lL - then.lL), Math.abs(now.lR - then.lR), Math.abs(now.PR - then.PR) / 3) * 100;
+  }
+  function updateText() {
+    const d = derive();
+    const pcL = Math.round(d.cL * 100), pcR = Math.round(d.cR * 100);
+    readoutEl.innerHTML = '<span class="L">Left:</span> ' + S.NL + ' water, ' + P.SL + ' sucrose — free water ' + d.freeL + ' (' + pcL + ' %)<br>' +
+      '<span class="R">Right:</span> ' + S.NR + ' water, ' + P.SR + ' sucrose — free water ' + d.freeR + ' (' + pcR + ' %)<br>' +
+      'Crossings per second: left → right ' + S.rLR.toFixed(1) + ', right → left ' + S.rRL.toFixed(1);
+    timeEl.textContent = 't = ' + S.t.toFixed(1) + ' s';
+    let msg, eq = false;
+    const hiSide = d.cL > d.cR ? 'left' : 'right';
+    const same = Math.abs(d.cL - d.cR) < 0.02;
+    const drift = trendFlat(8);
+    const settled = S.held || Math.abs(S.net) < 0.02 || (S.t > 10 && drift !== null && drift < 5);
+    if (S.t === 0) {
+      msg = same
+        ? 'Press <b>Start</b>. Free water is the same on both sides (' + pcL + ' %), so the two sides will send equal numbers of molecules across: no net movement, even though water keeps crossing.'
+        : 'Press <b>Start</b>. Free water is ' + pcL + ' % on the left and ' + pcR + ' % on the right, so expect more crossings from the ' + hiSide + ' side and a net flow toward the ' + (hiSide === 'left' ? 'right' : 'left') + '.';
+    } else if (!P.rigid && P.beta === 0 && !same && (S.held || S.NL <= minWater() || S.NR <= minWater() || d.freeL === 0 || d.freeR === 0)) {
+      msg = '<b>The lower column has dropped to its last pore.</b> With nothing pushing back, water kept moving one way until the side with more free water could no longer reach a pore. Real columns have weight: set the push-back above 0 and compare.';
+    } else if (settled) {
+      eq = true;
+      if (P.rigid) msg = '<b>Equilibrium.</b> Turgor pressure in the rigid compartment pushes back as hard as the free-water difference pulls. Free water is still unequal (' + pcL + ' % vs ' + pcR + ' %), only a few molecules entered, and the net flow is zero: water keeps crossing both ways at the same rate.';
+      else if (same) msg = '<b>Equilibrium.</b> Free water is the same on both sides (' + pcL + ' % vs ' + pcR + ' %), so the two sides send equal numbers of molecules across. Water still crosses in both directions; the levels wobble by a molecule or two — that is what equilibrium looks like at this scale.';
+      else msg = '<b>Equilibrium.</b> The higher column pushes back as hard as the free-water difference pulls. Free water is still unequal (' + pcL + ' % vs ' + pcR + ' %), but the net flow is zero: water keeps crossing both ways at the same rate, and the levels only wobble.';
+    } else {
+      const dir = S.net > 0 ? 'right' : 'left';
+      const sender = S.rLR >= S.rRL ? 'left' : 'right';
+      const hiRate = Math.max(S.rLR, S.rRL).toFixed(1), loRate = Math.min(S.rLR, S.rRL).toFixed(1);
+      if (sender === hiSide) {
+        msg = '<b>Net flow to the ' + dir + '.</b> Free water is ' + pcL + ' % on the left and ' + pcR + ' % on the right, so more molecules cross from the ' + hiSide + ' (' + hiRate + ' per s) than back (' + loRate + ' per s).' +
+          (P.rigid ? ' The rigid wall cannot stretch, so pressure is building on the right instead of a rising level.' : (P.beta === 0 ? ' Nothing pushes back, so this will not stop until the free water on the two sides is equal — or one side runs out.' : ' As the column rises, its weight pushes more water back.'));
+      } else {
+        msg = '<b>Net flow to the ' + dir + '.</b> Free water is still higher on the ' + hiSide + ' (' + pcL + ' % vs ' + pcR + ' %), but the pressure on the ' + sender + ' side now makes it send more molecules across (' + hiRate + ' per s) than it receives (' + loRate + ' per s): the system is moving back toward balance.';
+      }
+    }
+    if (msg !== lastMsg) { statusEl.innerHTML = msg; statusEl.classList.toggle('eq', eq); lastMsg = msg; }
+  }
+
+  // ------------------------------------------------------------ controls
+  const $ = id => document.getElementById(id);
+  const bind = (id, key, fmt, onChange) => {
+    const el = $(id), out = $(id + 'v');
+    const show = () => { out.textContent = fmt ? fmt(el.value) : el.value; };
+    el.addEventListener('input', () => { P[key] = parseFloat(el.value); show(); if (onChange) onChange(); S.held = false; S.pendL = 0; S.pendR = 0; reconcile(); updateText(); if (!S.running) { step(0); draw(); drawCharts(); } });
+    show();
+  };
+  bind('sL', 'SL'); bind('sR', 'SR'); bind('shell', 'shell'); bind('perm', 'perm');
+  bind('beta', 'beta', v => parseFloat(v).toFixed(1));
+  bind('speed', 'speed', v => parseFloat(v).toFixed(1));
+  bind('n0', 'N0', null, () => reset());
+  $('rigid').addEventListener('change', e => { P.rigid = e.target.checked; S.held = false; S.pendL = 0; S.pendR = 0; reconcile(); updateText(); if (!S.running) { step(0); draw(); drawCharts(); } });
+
+  const btnRun = $('btnRun');
+  btnRun.addEventListener('click', () => { S.running = !S.running; btnRun.textContent = S.running ? 'Pause' : 'Start'; updateText(); });
+  $('btnReset').addEventListener('click', () => { S.running = false; btnRun.textContent = 'Start'; reset(); updateText(); drawCharts(); });
+
+  function applyPreset(name) {
+    const set = (id, v) => { $(id).value = v; };
+    const presets = {
+      figure:     { SL: 0, SR: 4, shell: 8, beta: 1.0, rigid: false },
+      equal:      { SL: 4, SR: 4, shell: 8, beta: 1.0, rigid: false },
+      both:       { SL: 2, SR: 5, shell: 8, beta: 1.0, rigid: false },
+      nopressure: { SL: 0, SR: 4, shell: 8, beta: 0.0, rigid: false },
+      cell:       { SL: 0, SR: 4, shell: 8, beta: 1.0, rigid: true }
+    };
+    const p = presets[name]; if (!p) return;
+    Object.assign(P, p);
+    set('sL', P.SL); set('sR', P.SR); set('shell', P.shell); set('beta', P.beta); $('rigid').checked = P.rigid;
+    $('sLv').textContent = P.SL; $('sRv').textContent = P.SR; $('shellv').textContent = P.shell; $('betav').textContent = P.beta.toFixed(1);
+    S.running = false; btnRun.textContent = 'Start';
+    reset(); updateText(); drawCharts();
+  }
+  document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => applyPreset(b.dataset.preset)));
+
+  // ------------------------------------------------------------ main loop
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    step(dt);
+    draw();
+    if (S.running || S.t === 0) { drawCharts(); updateText(); }
+    requestAnimationFrame(frame);
+  }
+  reset(); updateText(); drawCharts();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
